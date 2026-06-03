@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 1. Roles based on your three-panel structure
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+// 2. Status for leave management
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  // Use String for ID to match Supabase Auth UUIDs
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String?
+  role          Role     @default(USER)
+  
+  // REQUIREMENT: Soft Delete (Active/Inactive users)
+  isActive      Boolean  @default(true)
+  
+  // REQUIREMENT: Leave Quota Management
+  // Super Admin can modify both; Admin is restricted from modifying these via logic
+  baseLeaveQuota  Int    @default(20)
+  extraLeaveQuota Int    @default(0)
+
+  // Relations
+  leaves        Leave[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("users") // Maps to 'users' table in PostgreSQL
+}
+
+model Leave {
+  id          String      @id @default(cuid())
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  
+  // Linking leave to the User
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("leaves")
+}
